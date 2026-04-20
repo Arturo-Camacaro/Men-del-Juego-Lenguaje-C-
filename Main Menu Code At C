@@ -2,31 +2,33 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define Max_slots 3
+#define MAX_SLOTS 3 
 
 int IdiomaActual = 0;
 const char * textos [2][10] = {
     {
-        "Nueva Partida",
-        "Cargar Partida",
-        "Estadisticas",
-        "Configuracion",
+        "Nueva Partida", 
+        "Cargar Partida", 
+        "Estadisticas", 
+        "Configuracion", 
         "Salir",
-        "Seleccione una Opcion: ",
-        "Idioma cambiado a Español",
-        "Ingrese su nombre",
-        "Partida Guardada",
+        "Seleccione una Opcion: ", 
+        "Idioma cambiado a Español", 
+        "Ingrese su nombre", 
+        "Partida Guardada", 
+        "Seleccione Slot (1-3): "
     },
     {
-        "New Game",
-        "Load Game",
-        "Statistics",
-        "Configuration",
+        "New Game", 
+        "Load Game", 
+        "Statistics", 
+        "Configuration", 
         "Exit",
-        "Select an Option: ",
-        "Language changed to English",
-        "Enter your name",
-        "Game Saved",
+        "Select an Option: ", 
+        "Language changed to English", 
+        "Enter your name", 
+        "Game Saved", 
+        "Select Slot (1-3): "
     }
 };
 
@@ -38,17 +40,18 @@ typedef struct {
 
 void MostrarDatos(Partida p) {
     printf("\n---------------------------\n");
-    printf(" Player: %s\n", p.nombre);
-    printf(" Score:  %d\n", p.puntos);
-    printf(" Level:  %d\n", p.nivel);
+    printf(" PLAYER: %s\n", p.nombre);
+    printf(" SCORE:  %d\n", p.puntos);
+    printf(" LEVEL:  %d\n", p.nivel);
     printf("---------------------------\n");
 }
 
 void GuardarEnSlot(Partida p, int slot) {
-    Partida todos[Max_slots] = {0}; 
+    Partida todos[MAX_SLOTS] = {0}; 
+    
     FILE *archivo = fopen("save.dat", "rb");
     if (archivo != NULL) {
-        fread(todos, sizeof(Partida), Max_slots, archivo);
+        fread(todos, sizeof(Partida), MAX_SLOTS, archivo);
         fclose(archivo);
     }
 
@@ -56,18 +59,18 @@ void GuardarEnSlot(Partida p, int slot) {
 
     archivo = fopen("save.dat", "wb");
     if (archivo != NULL) {
-        fwrite(todos, sizeof(Partida), Max_slots, archivo);
+        fwrite(todos, sizeof(Partida), MAX_SLOTS, archivo);
         fclose(archivo);
         printf("\n%s (Slot %d)\n", textos[IdiomaActual][8], slot + 1);
     }
 }
 
 int CargarDeSlot(Partida *p, int slot) {
-    Partida todos[Max_slots];
+    Partida todos[MAX_SLOTS];
     FILE *archivo = fopen("save.dat", "rb");
     if (archivo == NULL) return 0; 
 
-    fread(todos, sizeof(Partida), Max_slots, archivo);
+    fread(todos, sizeof(Partida), MAX_SLOTS, archivo);
     fclose(archivo);
 
     if (strlen(todos[slot].nombre) == 0) return 0;
@@ -87,7 +90,6 @@ void MostrarMenu() {
     printf("%s", textos[IdiomaActual][5]);
 }
 
-
 int main() {
     int opcion, slot;
     Partida partidaActual = {"Sin Nombre", 0, 0};
@@ -104,10 +106,10 @@ int main() {
         system("cls || clear");
 
         switch (opcion) {
-            case 1: 
+            case 1:
                 printf("%s", textos[IdiomaActual][9]);
                 scanf("%d", &slot);
-                if(slot < 1 || slot > Max_slots) break;
+                if(slot < 1 || slot > MAX_SLOTS) break;
 
                 printf("%s: ", textos[IdiomaActual][7]);
                 scanf("%s", partidaActual.nombre);
@@ -118,12 +120,13 @@ int main() {
                 GuardarEnSlot(partidaActual, slot - 1); 
                 break;
 
-            case 2: 
+            case 2:
                 printf("%s", textos[IdiomaActual][9]);
                 scanf("%d", &slot);
-                if(slot < 1 || slot > ) break;
+                if(slot < 1 || slot > MAX_SLOTS) break;
 
                 if (CargarDeSlot(&partidaActual, slot - 1)) {
+                    printf("%s...\n", textos[IdiomaActual][1]);
                     MostrarDatos(partidaActual); 
                 } else {
                     printf("\nSlot vacio / Empty slot.\n");
@@ -142,7 +145,7 @@ int main() {
                 printf("\n%s\n", textos[IdiomaActual][6]);
                 break;
 
-            case 5: 
+            case 5:
                 system("cls || clear");
                 printf("--- RESUMEN FINAL ---\n");
                 MostrarDatos(partidaActual); 
