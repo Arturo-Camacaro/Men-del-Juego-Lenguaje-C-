@@ -40,9 +40,9 @@ typedef struct {
 
 void MostrarDatos(Partida p) {
     printf("\n---------------------------\n");
-    printf(" PLAYER: %s\n", p.nombre);
-    printf(" SCORE:  %d\n", p.puntos);
-    printf(" LEVEL:  %d\n", p.nivel);
+    printf(" Player: %s\n", p.nombre);
+    printf(" Score:  %d\n", p.puntos);
+    printf(" Level:  %d\n", p.nivel);
     printf("---------------------------\n");
 }
 
