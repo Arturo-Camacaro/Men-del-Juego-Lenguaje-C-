@@ -1,34 +1,37 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #define MAX_SLOTS 3 
 
 int IdiomaActual = 0;
-const char * textos [2][10] = {
+const char * textos [2][11] = {
     {
-        "Nueva Partida", 
-        "Cargar Partida", 
-        "Estadisticas", 
-        "Configuracion", 
+        "Nueva Partida",
+        "Cargar Partida",
+        "Estadisticas",
+        "Configuracion",
         "Salir",
-        "Seleccione una Opcion: ", 
-        "Idioma cambiado a Español", 
+        "Seleccione una Opcion: ",
+        "Idioma cambiado a Español",
         "Ingrese su nombre", 
-        "Partida Guardada", 
-        "Seleccione Slot (1-3): "
+        "Partida Guardada",
+        "Seleccione Slot (1-3): ",
+        "1. Manual | 2. Aleatorio: "
     },
     {
-        "New Game", 
-        "Load Game", 
-        "Statistics", 
-        "Configuration", 
+        "New Game",
+        "Load Game",
+        "Statistics",
+        "Configuration",
         "Exit",
-        "Select an Option: ", 
-        "Language changed to English", 
+        "Select an Option: ",
+        "Language changed to English",
         "Enter your name", 
-        "Game Saved", 
-        "Select Slot (1-3): "
+        "Game Saved",
+        "Select Slot (1-3): ",
+        "1. Manual | 2. Random: "
     }
 };
 
@@ -48,7 +51,6 @@ void MostrarDatos(Partida p) {
 
 void GuardarEnSlot(Partida p, int slot) {
     Partida todos[MAX_SLOTS] = {0}; 
-    
     FILE *archivo = fopen("save.dat", "rb");
     if (archivo != NULL) {
         fread(todos, sizeof(Partida), MAX_SLOTS, archivo);
@@ -61,7 +63,7 @@ void GuardarEnSlot(Partida p, int slot) {
     if (archivo != NULL) {
         fwrite(todos, sizeof(Partida), MAX_SLOTS, archivo);
         fclose(archivo);
-        printf("\n%s (Slot %d)\n", textos[IdiomaActual][8], slot + 1);
+        printf("\n>>> %s (Slot %d) <<<\n", textos[IdiomaActual][8], slot + 1);
     }
 }
 
@@ -79,6 +81,16 @@ int CargarDeSlot(Partida *p, int slot) {
     return 1;
 }
 
+void GenerarAleatorio(Partida *p) {
+    char *nombres[] = {"Kaelen", "Ironclad", "Valerius", "Sombra", "Eldrin"};
+    srand(time(NULL));
+    
+    int indice = rand() % 5;
+    strcpy(p->nombre, nombres[indice]);
+    p->puntos = rand() % 100 + 10;
+    p->nivel = 1;
+}
+
 void MostrarMenu() {
     printf("=================================\n");
     printf(" --- AS DE PICAS - CARD GAME --- \n");
@@ -91,14 +103,13 @@ void MostrarMenu() {
 }
 
 int main() {
-    int opcion, slot;
+    int opcion, slot, subOpcion;
     Partida partidaActual = {"Sin Nombre", 0, 0};
 
     do {
         MostrarMenu();
-        
         if (scanf("%d", &opcion) != 1) {
-            printf("\nError: Ingrese un numero.\n");
+            printf("\nError\n");
             while (getchar() != '\n'); 
             continue;
         }
@@ -111,13 +122,20 @@ int main() {
                 scanf("%d", &slot);
                 if(slot < 1 || slot > MAX_SLOTS) break;
 
-                printf("%s: ", textos[IdiomaActual][7]);
-                scanf("%s", partidaActual.nombre);
-                partidaActual.puntos = 0; 
-                partidaActual.nivel = 1;
+                printf("%s", textos[IdiomaActual][10]);
+                scanf("%d", &subOpcion);
+
+                if(subOpcion == 2) {
+                    GenerarAleatorio(&partidaActual);
+                } else {
+                    printf("%s: ", textos[IdiomaActual][7]);
+                    scanf("%s", partidaActual.nombre);
+                    partidaActual.puntos = 0; 
+                    partidaActual.nivel = 1;
+                }
                 
                 MostrarDatos(partidaActual); 
-                GuardarEnSlot(partidaActual, slot - 1); 
+                GuardarEnSlot(partidaActual, slot - 1);
                 break;
 
             case 2:
@@ -126,10 +144,10 @@ int main() {
                 if(slot < 1 || slot > MAX_SLOTS) break;
 
                 if (CargarDeSlot(&partidaActual, slot - 1)) {
-                    printf("%s...\n", textos[IdiomaActual][1]);
+                    printf("\n%s...\n", textos[IdiomaActual][1]);
                     MostrarDatos(partidaActual); 
                 } else {
-                    printf("\nSlot vacio / Empty slot.\n");
+                    printf("\n[ Slot vacio / Empty slot ]\n");
                 }
                 break;
 
@@ -148,8 +166,11 @@ int main() {
             case 5:
                 system("cls || clear");
                 printf("--- RESUMEN FINAL ---\n");
+                if(strlen(partidaActual.nombre) > 0 && strcmp(partidaActual.nombre, "Sin Nombre") != 0) {
+                     printf("(Auto-saving...)\n");
+                }
                 MostrarDatos(partidaActual); 
-                printf("\n¡Gracias por jugar! / Bye!\n");
+                printf("\n¡Gracias por jugar!\n");
                 break;
         }
         
