@@ -6,46 +6,73 @@
 #define MAX_SLOTS 3 
 
 int IdiomaActual = 0;
-const char * textos [2][11] = {
-    {
-        "Nueva Partida",
+int DificultadActual = 1; 
+
+const char *textos[2][15] = {
+    { 
+        "Nueva Partida", 
         "Cargar Partida",
         "Estadisticas",
         "Configuracion",
         "Salir",
-        "Seleccione una Opcion: ",
-        "Idioma cambiado a Español",
-        "Ingrese su nombre", 
+        "Seleccione una Opcion: ", 
+        "Idioma cambiado",
+        "Ingrese su nombre",
         "Partida Guardada",
-        "Seleccione Slot (1-3): ",
-        "1. Manual | 2. Aleatorio: "
+        "Seleccione Slot (1-3): ", 
+        "1. Manual | 2. Aleatorio: ",
+        "Dificultad",
+        "Idioma",
+        "Volver",
+        "Dificultad cambiada" 
     },
-    {
-        "New Game",
-        "Load Game",
-        "Statistics",
-        "Configuration",
-        "Exit",
-        "Select an Option: ",
-        "Language changed to English",
+    { 
+        "New Game", 
+        "Load Game", 
+        "Statistics", 
+        "Configuration", 
+        "Exit", 
+        "Select an Option: ", 
+        "Language changed", 
         "Enter your name", 
-        "Game Saved",
-        "Select Slot (1-3): ",
-        "1. Manual | 2. Random: "
+        "Game Saved", 
+        "Select Slot (1-3): ", 
+        "1. Manual | 2. Random: ", 
+        "Difficulty", 
+        "Language", 
+        "Back", 
+        "Difficulty changed" 
     }
+};
+
+const char *nivelesDificultad[2][3] = {
+    { "Facil", "Normal", "Dificil" },
+    { "Easy", "Normal", "Hard" }
 };
 
 typedef struct {
     char nombre[50];
     int puntos;
     int nivel;
+    int dificultad;
 } Partida;
+
+void LimpiarPantalla() {
+    system("cls || clear");
+}
+
+void Pausa() {
+    printf("\nPress Enter...");
+    while (getchar() != '\n');
+    getchar();
+}
 
 void MostrarDatos(Partida p) {
     printf("\n---------------------------\n");
     printf(" Player: %s\n", p.nombre);
     printf(" Score:  %d\n", p.puntos);
     printf(" Level:  %d\n", p.nivel);
+    printf(" Diff:   %s\n", nivelesDificultad[IdiomaActual][p.dificultad]);
     printf("---------------------------\n");
 }
 
@@ -56,9 +83,7 @@ void GuardarEnSlot(Partida p, int slot) {
         fread(todos, sizeof(Partida), MAX_SLOTS, archivo);
         fclose(archivo);
     }
-
     todos[slot] = p;
-
     archivo = fopen("save.dat", "wb");
     if (archivo != NULL) {
         fwrite(todos, sizeof(Partida), MAX_SLOTS, archivo);
@@ -71,50 +96,70 @@ int CargarDeSlot(Partida *p, int slot) {
     Partida todos[MAX_SLOTS];
     FILE *archivo = fopen("save.dat", "rb");
     if (archivo == NULL) return 0; 
-
     fread(todos, sizeof(Partida), MAX_SLOTS, archivo);
     fclose(archivo);
-
     if (strlen(todos[slot].nombre) == 0) return 0;
-
     *p = todos[slot];
     return 1;
 }
 
-void GenerarAleatorio(Partida *p) {
-    char *nombres[] = {"Kaelen", "Ironclad", "Valerius", "Sombra", "Eldrin"};
-    srand(time(NULL));
-    
-    int indice = rand() % 5;
-    strcpy(p->nombre, nombres[indice]);
-    p->puntos = rand() % 100 + 10;
-    p->nivel = 1;
+void MenuConfiguracion() {
+    int subOpcion;
+    do {
+        LimpiarPantalla();
+        printf("=== %s ===\n", textos[IdiomaActual][3]);
+        printf("1. %s (%s)\n", textos[IdiomaActual][12], IdiomaActual == 0 ? "Español" : "English");
+        printf("2. %s (%s)\n", textos[IdiomaActual][11], nivelesDificultad[IdiomaActual][DificultadActual]);
+        printf("3. %s\n", textos[IdiomaActual][13]);
+        printf("==================\n%s", textos[IdiomaActual][5]);
+        
+        scanf("%d", &subOpcion);
+        
+        switch(subOpcion) {
+            case 1:
+                printf("\n0. Español | 1. English: ");
+                scanf("%d", &IdiomaActual);
+                if(IdiomaActual < 0 || IdiomaActual > 1) IdiomaActual = 0;
+                printf("%s\n", textos[IdiomaActual][6]);
+                Pausa();
+                break;
+            case 2:
+                printf("\n0. %s | 1. %s | 2. %s: ", nivelesDificultad[IdiomaActual][0], nivelesDificultad[IdiomaActual][1], nivelesDificultad[IdiomaActual][2]);
+                scanf("%d", &DificultadActual);
+                if(DificultadActual < 0 || DificultadActual > 2) DificultadActual = 1;
+                printf("%s\n", textos[IdiomaActual][14]);
+                Pausa();
+                break;
+        }
+    } while (subOpcion != 3);
 }
 
-void MostrarMenu() {
-    printf("=================================\n");
-    printf(" --- AS DE PICAS - CARD GAME --- \n");
-    printf("=================================\n");
+void MostrarMenuPrincipal() {
+    printf("=====================================\n");
+    printf(" --- The Title Is Still Working --- \n");
+    printf("=====================================\n");
     for(int i = 0; i < 5; i++) {
         printf("%d. %s\n", i + 1, textos[IdiomaActual][i]);
     }
-    printf("=================================\n");
+    printf("=====================================\n");
     printf("%s", textos[IdiomaActual][5]);
 }
 
 int main() {
     int opcion, slot, subOpcion;
-    Partida partidaActual = {"Sin Nombre", 0, 0};
+    Partida partidaActual = {"Sin Nombre", 0, 0, 1};
 
     do {
-        MostrarMenu();
+        LimpiarPantalla();
+        MostrarMenuPrincipal();
+        
         if (scanf("%d", &opcion) != 1) {
             printf("\nError\n");
             while (getchar() != '\n'); 
             continue;
         }
 
-        system("cls || clear");
+        LimpiarPantalla();
 
         switch (opcion) {
             case 1:
@@ -126,59 +171,50 @@ int main() {
                 scanf("%d", &subOpcion);
 
                 if(subOpcion == 2) {
-                    GenerarAleatorio(&partidaActual);
+                    char *nombres[] = {"Alaric", "Elara"};
+                    srand(time(NULL));
+                    strcpy(partidaActual.nombre, nombres[rand() % 2]);
+                    partidaActual.puntos = rand() % 100;
                 } else {
                     printf("%s: ", textos[IdiomaActual][7]);
                     scanf("%s", partidaActual.nombre);
-                    partidaActual.puntos = 0; 
-                    partidaActual.nivel = 1;
+                    partidaActual.puntos = 0;
                 }
+                partidaActual.nivel = 1;
+                partidaActual.dificultad = DificultadActual; 
                 
                 MostrarDatos(partidaActual); 
                 GuardarEnSlot(partidaActual, slot - 1);
+                Pausa();
                 break;
 
-            case 2:
+            case 2: 
                 printf("%s", textos[IdiomaActual][9]);
                 scanf("%d", &slot);
-                if(slot < 1 || slot > MAX_SLOTS) break;
-
                 if (CargarDeSlot(&partidaActual, slot - 1)) {
                     printf("\n%s...\n", textos[IdiomaActual][1]);
+                    DificultadActual = partidaActual.dificultad; 
                     MostrarDatos(partidaActual); 
                 } else {
                     printf("\n[ Slot vacio / Empty slot ]\n");
                 }
+                Pausa();
                 break;
 
             case 3:
                 printf("--- %s ---\n", textos[IdiomaActual][2]);
                 MostrarDatos(partidaActual);
+                Pausa();
                 break;
 
-            case 4:
-                printf("0. Español\n1. English\n> ");
-                scanf("%d", &IdiomaActual);
-                if(IdiomaActual < 0 || IdiomaActual > 1) IdiomaActual = 0;
-                printf("\n%s\n", textos[IdiomaActual][6]);
+            case 4: 
+                MenuConfiguracion();
                 break;
 
             case 5:
-                system("cls || clear");
-                printf("--- RESUMEN FINAL ---\n");
-                if(strlen(partidaActual.nombre) > 0 && strcmp(partidaActual.nombre, "Sin Nombre") != 0) {
-                     printf("(Auto-saving...)\n");
-                }
-                MostrarDatos(partidaActual); 
-                printf("\n¡Gracias por jugar!\n");
+                printf("¡Gracias por jugar!\n");
                 break;
         }
-        
-        printf("\nPress Enter...");
-        while (getchar() != '\n');
-        getchar();
-        system("cls || clear");
-
     } while (opcion != 5);
 
     return 0;
