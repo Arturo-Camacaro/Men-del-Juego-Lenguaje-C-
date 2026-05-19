@@ -253,3 +253,75 @@ int main() {
 
     return 0;
 }
+
+#include <stdio.h>
+#include <string.h>
+
+// Definición de la estructura para los personajes
+typedef struct {
+    int id;
+    char nombre[50];
+    char tipo[20];
+    int hp;
+    int def;
+    int atk;
+    int power;
+} Personaje;
+
+// Función que simula el ataque
+void simular_ataque(Personaje atacante, Personaje *defensor) {
+    // Fórmula de daño: (ATK + POWER) - DEF
+    int daño = (atacante.atk + atacante.power) - defensor->def;
+    
+    // El daño mínimo siempre debe ser al menos 1
+    if (daño <= 0) {
+        daño = 1;
+    }
+    
+    // Restar vida al defensor
+    int hp_inicial = defensor->hp;
+    defensor->hp -= daño;
+    if (defensor->hp < 0) {
+        defensor->hp = 0;
+    }
+    
+    // Mostrar el resultado por pantalla
+    printf("⚔️  %s (%s) ataca a %s (%s)!\n", atacante.nombre, atacante.tipo, defensor->nombre, defensor->tipo);
+    printf("💥 Danio infligido: %d (Ataque total: %d vs Defensa: %d)\n", daño, (atacante.atk + atacante.power), defensor->def);
+    
+    if (defensor->hp == 0) {
+        printf("💀 ¡%s ha sido derrotado!\n", defensor->nombre);
+    } else {
+        printf("❤️  %s queda con %d/%d HP.\n", defensor->nombre, defensor->hp, hp_inicial);
+    }
+    printf("--------------------------------------------------\n");
+}
+
+int main() {
+    // Inicialización de la lista de personajes basados en tu tabla
+    Personaje personajes[12] = {
+        {1, "Alaric", "Guerrero", 150, 150, 150, 150},
+        {2, "Elara", "Distancia", 100, 50, 200, 250},
+        {3, "Gareth, el Leal", "Tanque", 250, 200, 100, 50},
+        {4, "Espectro de Obsidiana", "Tanque", 250, 200, 100, 50},
+        {5, "Jaspe, el Baron Rojo", "Guerrero", 150, 150, 150, 150},
+        {6, "Selene, Demonio de Plata", "Distancia", 100, 50, 200, 250},
+        {7, "Gehrman, el Verdugo", "Tanque", 250, 200, 100, 50},
+        {8, "Kira, Asesino de Monstruos", "Distancia", 100, 50, 200, 250},
+        {9, "Orion, Cazador Celestial", "Guerrero", 150, 150, 150, 150},
+        {10, "El Arcano", "Guerrero", 300, 50, 0, 250},
+        {11, "Rey Cedric", "Tanque", 250, 200, 100, 50},
+        {12, "Principe Arthur", "Distancia", 150, 150, 150, 150}
+    };
+
+    // --- EJEMPLOS DE PRUEBA ---
+    
+    // Ejemplo 1: Elara (ID 2, índice 1) ataca a Gareth (ID 3, índice 2)
+    // Pasamos el defensor por referencia (&) para que su HP se actualice de verdad
+    simular_ataque(personajes[1], &personajes[2]);
+
+    // Ejemplo 2: Alaric (ID 1, índice 0) ataca a El Arcano (ID 10, índice 9)
+    simular_ataque(personajes[0], &personajes[9]);
+
+    return 0;
+}
