@@ -2,56 +2,34 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <ctype.h> // Librería necesaria para tolower()
+#include <ctype.h>
 
 #define MAX_SLOTS 3 
 
-int IdiomaActual = 0;
-int DificultadActual = 1; 
+// --- VARIABLES GLOBALES DE ESTADO ---
+int IdiomaActual = 0;      // 0 = ESP, 1 = ENG, 2 = POR, 3 = GER
+int DificultadActual = 1;  // 0 = Fácil, 1 = Normal, 2 = Difícil
 
-const char *textos[2][16] = { // Aumentamos a 16 para la advertencia
-    { 
-        "Nueva Partida", 
-        "Cargar Partida", 
-        "Estadisticas", 
-        "Configuracion", 
-        "Salir",
-        "Seleccione una Opcion: ", 
-        "Idioma cambiado", 
-        "Ingrese su nombre", 
-        "Partida Guardada",
-        "Seleccione Slot (1-3): ", 
-        "1. Manual | 2. Aleatorio: ", 
-        "Dificultad", 
-        "Idioma",
-        "Volver", 
-        "Dificultad cambiada", 
-        "No se acepta este tipo de vocabulario", 
-    },
-    { 
-        "New Game", 
-        "Load Game", 
-        "Statistics", 
-        "Configuration", 
-        "Exit",
-        "Select an Option: ", 
-        "Language changed", 
-        "Enter your name", 
-        "Game Saved",
-        "Select Slot (1-3): ", 
-        "1. Manual | 2. Random: ", 
-        "Difficulty", 
-        "Language",
-        "Back", 
-        "Difficulty changed", 
-        "This type of vocabulary is not accepted", 
-    }
-};
+typedef enum {
+    IMPERIO_HIERRO,
+    GUARDIANES_TIERRA,
+    SINDICATO_VACIO
+} Casa_t;
 
-const char *nivelesDificultad[2][3] = {
-    { "Facil", "Normal", "Dificil" },
-    { "Easy", "Normal", "Hard" }
-};
+typedef struct {
+    char id[10];
+    char nombre_es[40];
+    char nombre_en[40];
+    Casa_t casa;
+    int hp_max;
+    int def;
+    int atk;
+    int power;
+    char hab_nombre_es[30];
+    char hab_nombre_en[30];
+    char desc_hab_es[100];
+    char desc_hab_en[100];
+} Personaje_t;
 
 typedef struct {
     char nombre[50];
@@ -60,14 +38,298 @@ typedef struct {
     int dificultad;
 } Partida;
 
-// --- FUNCIÓN DE PROCESAMIENTO DE TEXTO (Censura y Minúsculas) ---
+// --- MATRICES DE TEXTO LOCALIZADAS (4 Idiomas) ---
+const char *textos[4][16] = {
+    { // 0. ESPAÑOL
+        "Nueva Partida", "Cargar Partida", "Estadisticas", "Configuracion", "Salir",
+        "Seleccione una Opcion: ", "Idioma cambiado", "Ingrese su nombre", "Partida Guardada",
+        "Seleccione Slot (1-3): ", "", "Dificultad", "Idioma",
+        "Volver", "Dificultad cambiada", "No se acepta este tipo de vocabulario" 
+    },
+    { // 1. ENGLISH
+        "New Game", "Load Game", "Statistics", "Configuration", "Exit",
+        "Select an Option: ", "Language changed", "Enter your name", "Game Saved",
+        "Select Slot (1-3): ", "", "Difficulty", "Language",
+        "Back", "Difficulty changed", "This type of vocabulary is not accepted" 
+    },
+    { // 2. PORTUGUÊS
+        "Novo Jogo", "Carregar Jogo", "Estatisticas", "Configuracao", "Sair",
+        "Selecione uma Opcao: ", "Idioma alterado", "Digite seu nome", "Jogo Salvo",
+        "Selecione o Slot (1-3): ", "", "Dificuldade", "Idioma",
+        "Voltar", "Dificuldade alterada", "Este tipo de vocabulario nao e aceito"
+    },
+    { // 3. DEUTSCH
+        "Neues Spiel", "Spiel Laden", "Statistiken", "Konfiguration", "Beenden",
+        "Wahlen Sie eine Option: ", "Sprache geandert", "Geben Sie Ihren Namen ein", "Spiel Gespeichert",
+        "Slot Auswahlen (1-3): ", "", "Schwierigkeit", "Sprache",
+        "Zuruck", "Schwierigkeit geandert", "Diese Art von Vokabular wird nicht akzeptiert"
+    }
+};
+
+const char *nivelesDificultad[4][3] = {
+    { "Facil", "Normal", "Dificil" },
+    { "Easy", "Normal", "Hard" },
+    { "Facil", "Normal", "Dificil" },
+    { "Leicht", "Normal", "Schwer" }
+};
+
+const char *nombresIdiomas[4] = {
+    "Español",
+    "English",
+    "Português",
+    "Deutsch"
+};
+
+// --- CORE DEL SISTEMA DE PERSONAJES (OAKHAVEN) ---
+
+const char* obtener_nombre_casa(Casa_t casa) {
+    if (IdiomaActual == 0 || IdiomaActual == 2) { // Español / Português
+        switch (casa) {
+            case IMPERIO_HIERRO:    return "El Imperio de Hierro";
+            case GUARDIANES_TIERRA: return "Los Guardianes de la Tierra";
+            case SINDICATO_VACIO:   return "El Sindicato del Vacio";
+            default:                return "Desconocida";
+        }
+    } else if (IdiomaActual == 3) { // Deutsch
+        switch (casa) {
+            case IMPERIO_HIERRO:    return "Das Eiserne Imperium";
+            case GUARDIANES_TIERRA: return "Die Erdwachter";
+            case SINDICATO_VACIO:   return "Das Leere-Syndikat";
+            default:                return "Unbekannt";
+        }
+    } else { // English
+        switch (casa) {
+            case IMPERIO_HIERRO:    return "The Iron Empire";
+            case GUARDIANES_TIERRA: return "The Earth Guardians";
+            case SINDICATO_VACIO:   return "The Void Syndicate";
+            default:                return "Unknown";
+        }
+    }
+}
+
+void mostrar_carta_ascii(Personaje_t p) {
+    char* nombre = (IdiomaActual == 0) ? p.nombre_es : p.nombre_en;
+    char* hab_nombre = (IdiomaActual == 0) ? p.hab_nombre_es : p.hab_nombre_en;
+    char* desc_hab = (IdiomaActual == 0) ? p.desc_hab_es : p.desc_hab_en;
+    
+    char* tag_ilustracion = "ARTWORK:    ";
+    if (IdiomaActual == 0 || IdiomaActual == 2) tag_ilustracion = "ILUSTRACION:";
+    if (IdiomaActual == 3)                      tag_ilustracion = "ILLUSTRATION:";
+
+    printf(" _________________________________________________\n");
+    printf("|  ID: %-42s|\n", p.id);
+    printf("|=================================================|\n");
+    printf("|  %-47s|\n", nombre);
+    printf("|=================================================|\n");
+    printf("|  CASA: %-41s|\n", obtener_nombre_casa(p.casa));
+    printf("|                                                 |\n");
+    
+    if (strcmp(p.id, "IMP-01") == 0) {
+        printf("|               /\\_/\\                             |\n");
+        printf("|              /     \\                            |\n");
+        printf("|             |  O O  |   [ %s ]        |\n", tag_ilustracion);
+        printf("|              \\  ^  /    %s|\n", (IdiomaActual == 0 || IdiomaActual == 2) ? "[ Casco Militar ]       " : "[ Military Helmet ]     ");
+        printf("|               |||||     %s|\n", (IdiomaActual == 0 || IdiomaActual == 2) ? "[     Imperial ]        " : "[    Imperial   ]       ");
+        printf("|              /     \\                            |\n");
+    } 
+    else if (strcmp(p.id, "IMP-02") == 0) {
+        printf("|                   .---.                         |\n");
+        printf("|                  /     \\      [ %s ]  |\n", tag_ilustracion);
+        printf("|                  | [ ] |      %s|\n", (IdiomaActual == 0 || IdiomaActual == 2) ? "[ Gran Escudo  ]  " : "[ Great Shield ]  ");
+        printf("|                   \\_ _/        %s|\n", (IdiomaActual == 0 || IdiomaActual == 2) ? "[  de Placas   ]  " : "[  Plated Iron ]  ");
+        printf("|                    |                            |\n");
+        printf("|                                                 |\n");
+    }
+    else if (strcmp(p.id, "IMP-03") == 0) {
+        printf("|                     |                           |\n");
+        printf("|                    ---        [ %s ]  |\n", tag_ilustracion);
+        printf("|                     |         %s|\n", (IdiomaActual == 0 || IdiomaActual == 2) ? "[  Espada Larga  ]  " : "[   Longsword    ]  ");
+        printf("|                     |         %s|\n", (IdiomaActual == 0 || IdiomaActual == 2) ? "[   y Ligera    ]  " : "[   and Light    ]  ");
+        printf("|                     v                           |\n");
+        printf("|                                                 |\n");
+    }
+    else if (strcmp(p.id, "IMP-04") == 0) {
+        printf("|                    (  .  )                      |\n");
+        printf("|                   (   )   )   [ %s ]  |\n", tag_ilustracion);
+        printf("|                  (  ( )) )    %s|\n", (IdiomaActual == 0 || IdiomaActual == 2) ? "[ Flama Pura y ]  " : "[ Pure & Wild  ]  ");
+        printf("|                   ( ' ) )     %s|\n", (IdiomaActual == 0 || IdiomaActual == 2) ? "[  Desatada    ]  " : "[ Bursting Fire]  ");
+        printf("|                    '-'-'                        |\n");
+        printf("|                                                 |\n");
+    }
+    else if (strcmp(p.id, "GDA-05") == 0) {
+        printf("|                    /\\_/\\                        |\n");
+        printf("|                   ((@v@))     [ %s ]  |\n", tag_ilustracion);
+        printf("|                   ():::()     %s|\n", (IdiomaActual == 0 || IdiomaActual == 2) ? "[ Totem de la  ]  " : "[ Totem of the ]  ");
+        printf("|                    VV-VV      %s|\n", (IdiomaActual == 0 || IdiomaActual == 2) ? "[  Montana     ]  " : "[  Mountain    ]  ");
+        printf("|                                                 |\n");
+    }
+    else if (strcmp(p.id, "GDA-06") == 0) {
+        printf("|                     (( ))                       |\n");
+        printf("|                    (     )    [ %s ]  |\n", tag_ilustracion);
+        printf("|                     (   )     %s|\n", (IdiomaActual == 0 || IdiomaActual == 2) ? "[ Arco de Caza ]  " : "[ Wooden Hunt  ]  ");
+        printf("|                      )-(      %s|\n", (IdiomaActual == 0 || IdiomaActual == 2) ? "[  de Madera   ]  " : "[  Shortbow    ]  ");
+        printf("|                     (   )                       |\n");
+    }
+    else if (strcmp(p.id, "GDA-07") == 0) {
+        printf("|                     |===|                       |\n");
+        printf("|                     |   |     [ %s ]  |\n", tag_ilustracion);
+        printf("|                   --|---|--   %s|\n", (IdiomaActual == 0 || IdiomaActual == 2) ? "[ Hacha Pesada ]  " : "[ Heavy Battle ]  ");
+        printf("|                     |   |     %s|\n", (IdiomaActual == 0 || IdiomaActual == 2) ? "[  de Combate  ]  " : "[  Greataxe    ]  ");
+        printf("|                     |   |                       |\n");
+    }
+    else if (strcmp(p.id, "GDA-08") == 0) {
+        printf("|                     /---\\                       |\n");
+        printf("|                    | [R] |    [ %s ]  |\n", tag_ilustracion);
+        printf("|                     \\---/     %s|\n", (IdiomaActual == 0 || IdiomaActual == 2) ? "[ Piedra Runica]  " : "[ Ancestral    ]  ");
+        printf("|                     |   |     %s|\n", (IdiomaActual == 0 || IdiomaActual == 2) ? "[  Ancestral   ]  " : "[ Runestone    ]  ");
+        printf("|                                                 |\n");
+    }
+    else if (strcmp(p.id, "SIN-09") == 0) {
+        printf("|                      _.-._                      |\n");
+        printf("|                     /  p  \\   [ %s ]  |\n", tag_ilustracion);
+        printf("|                    |   |   |  %s|\n", (IdiomaActual == 0 || IdiomaActual == 2) ? "[ Calavera de  ]  " : "[ Pure Crystal ]  ");
+        printf("|                     \\  v  /   %s|\n", (IdiomaActual == 0 || IdiomaActual == 2) ? "[  Cristal     ]  " : "[  Overlord    ]  ");
+        printf("|                      `---'                      |\n");
+    }
+    else if (strcmp(p.id, "SIN-10") == 0) {
+        printf("|                     .---.                       |\n");
+        printf("|                    / / \\ \\    [ %s ]  |\n", tag_ilustracion);
+        printf("|                    | |O| |    %s|\n", (IdiomaActual == 0 || IdiomaActual == 2) ? "[ El Ojo del   ]  " : "[ The Eye of   ]  ");
+        printf("|                    \\ \x2F / /    %s|\n", (IdiomaActual == 0 || IdiomaActual == 2) ? "[  Cosmos      ]  " : "[ the Cosmos   ]  ");
+        printf("|                     `---'                       |\n");
+    }
+    else if (strcmp(p.id, "SIN-11") == 0) {
+        printf("|                     |\\ /|                       |\n");
+        printf("|                     | X |     [ %s ]  |\n", tag_ilustracion);
+        printf("|                     |/ \\|     %s|\n", (IdiomaActual == 0 || IdiomaActual == 2) ? "[ Dagas Cruzadas ]  " : "[ Assassin     ]  ");
+        printf("|                      \\ /      %s|\n", (IdiomaActual == 0 || IdiomaActual == 2) ? "[  de Asesina  ]  " : "[ Twin Daggers ]  ");
+        printf("|                       v                         |\n");
+    }
+    else if (strcmp(p.id, "SIN-12") == 0) {
+        printf("|                     /---\\                       |\n");
+        printf("|                    | <?> |    [ %s ]  |\n", tag_ilustracion);
+        printf("|                     \\---/     %s|\n", (IdiomaActual == 0 || IdiomaActual == 2) ? "[ Falla de la  ]  " : "[ Reality      ]  ");
+        printf("|                    /     \\    %s|\n", (IdiomaActual == 0 || IdiomaActual == 2) ? "[  Realidad     ]  " : "[ Rifts & Flaws]  ");
+    }
+
+    printf("|-------------------------------------------------|\n");
+    if (IdiomaActual == 0 || IdiomaActual == 2) { 
+        printf("|  ESTADISTICAS BASE:                             |\n");
+        printf("|    [HP]:  %-3d         [DEF]: %-3d                |\n", p.hp_max, p.def);
+        printf("|    [ATK]: %-3d         [PWR]: %-3d                |\n", p.atk, p.power);
+        printf("|-------------------------------------------------|\n");
+        printf("|  HABILIDAD ESPECIAL:                            |\n");
+    } else if (IdiomaActual == 3) { 
+        printf("|  BASISWERTE:                                    |\n");
+        printf("|    [HP]:  %-3d         [DEF]: %-3d                |\n", p.hp_max, p.def);
+        printf("|    [ATK]: %-3d         [PWR]: %-3d                |\n", p.atk, p.power);
+        printf("|-------------------------------------------------|\n");
+        printf("|  SPEZIALFAHIGKEIT:                              |\n");
+    } else { 
+        printf("|  BASE STATS:                                    |\n");
+        printf("|    [HP]:  %-3d         [DEF]: %-3d                |\n", p.hp_max, p.def);
+        printf("|    [ATK]: %-3d         [PWR]: %-3d                |\n", p.atk, p.power);
+        printf("|-------------------------------------------------|\n");
+        printf("|  SPECIAL ABILITY:                               |\n");
+    }
+    printf("|  \"%-43s\"|\n", hab_nombre);
+    printf("|  %-47s|\n", desc_hab);
+    printf("|_________________________________________________|\n\n");
+}
+
+void SubmenuGestaOakhaven() {
+    // Único catálogo activo: Los 12 Campeones de Oakhaven
+    Personaje_t catalogo[12] = {
+        {"IMP-01", "Theron, el Capitan", "Theron, The Captain", IMPERIO_HIERRO, 110, 30, 30, 75, "Grito de Mando", "Commanding Shout", "Aumenta ATK y DEF aliados un 10%.", "Boosts ally ATK & DEF by 10%."},
+        {"IMP-02", "Kaelen, el Baluarte", "Kaelen, The Bulwark", IMPERIO_HIERRO, 150, 45, 15, 65, "Muralla Inquebrantable", "Unbreakable Wall", "Duplica DEF por 2 turnos, baja ATK a mitad.", "Doubles DEF for 2 turns, halves own ATK."},
+        {"IMP-03", "Jarek, el Filo Errante", "Jarek, The Wandering Blade", IMPERIO_HIERRO, 95, 20, 42, 85, "Estocada Critica", "Critical Strike", "Ignora el 30% de la DEF enemiga.", "Ignores 30% of target's DEF armor."},
+        {"IMP-04", "Lysandra, la Tejedora", "Lysandra, The Weaver", IMPERIO_HIERRO, 85, 15, 10, 120, "Explosion Piroclastica", "Pyroclastic Burst", "Dano masivo de POWER que ignora DEF fisica.", "Massive POWER damage. Ignores physical DEF."},
+        {"GDA-05", "Valna, la Matriarca", "Valna, The Matriarch", GUARDIANES_TIERRA, 135, 50, 12, 70, "Piel de Granito", "Granite Skin", "Refleja el 20% del dano fisico recibido.", "Reflects 20% of incoming physical damage."},
+        {"GDA-06", "Eira, la Guardiana", "Eira, The Warden", GUARDIANES_TIERRA, 100, 25, 32, 80, "Brisa Renovadora", "Refreshing Breeze", "Cura 30 HP y limpia estados alterados.", "Heals 30 HP and removes negative debuffs."},
+        {"GDA-07", "Garin, el Rompefilas", "Garin, The Breaker", GUARDIANES_TIERRA, 110, 18, 45, 80, "Frenesi Salvaje", "Wild Frenzy", "Sube ATK 5% por cada 10 de HP perdido.", "Gains +5% ATK for every 10 missing HP."},
+        {"GDA-08", "Orin, el Forjador Runico", "Orin, The Runeforger", GUARDIANES_TIERRA, 120, 35, 25, 70, "Sobrecarga Runica", "Runic Overdrive", "Sube +5 ATK/DEF por uso (Max 3 veces).", "Gains +5 ATK/DEF per cast (Stacks up to 3)."},
+        {"SIN-09", "Morwenna, la Nigromante", "Morwenna, The Necromancer", SINDICATO_VACIO, 75, 12, 18, 115, "Sifon de Alma", "Soul Siphon", "Suckea vida: drena el 50% del dano causado.", "Lifesteal: heals for 50% of damage dealt."},
+        {"SIN-10", "Zephyr, el Clerigo", "Zephyr, The Cleric", SINDICATO_VACIO, 90, 22, 15, 105, "Colapso Estelar", "Stellar Collapse", "Baja ATK y DEF del rival 15% por 3 turnos.", "Reduces foe's ATK & DEF by 15% for 3 turns."},
+        {"SIN-11", "Sira, la Sombra", "Sira, The Shadow", SINDICATO_VACIO, 80, 15, 48, 90, "Danza de Dagas", "Dagger Dance", "Ataca 2 veces pero su DEF baja a 5 este turno.", "Attacks twice but sets own DEF to 5 this turn."},
+        {"SIN-12", "Nix, el Buscador", "Nix, The Riftseeker", SINDICATO_VACIO, 95, 20, 25, 95, "Paradoja Espacial", "Spatial Paradox", "50% chance doble dano / 50% perder turno.", "50% chance for 2x damage / 50% to skip turn."}
+    };
+
+    int opcSub = 0;
+    do {
+        printf("\n===================================================\n");
+        if (IdiomaActual == 0) {
+            printf("          CRONICAS DE OAKHAVEN - LOG\n");
+            printf("===================================================\n");
+            printf("1. Listado rapido de heroes\n");
+            printf("2. Desplegar TODAS las cartas ilustradas (ASCII)\n");
+            printf("3. Buscar un heroe especifico por su ID\n");
+            printf("4. Volver al menu de gestion\n");
+        } else if (IdiomaActual == 2) {
+            printf("          CRONICAS DE OAKHAVEN - LOG\n");
+            printf("===================================================\n");
+            printf("1. Lista rapida de herois\n");
+            printf("2. Exibir TODAS as cartas ilustradas (ASCII)\n");
+            printf("3. Buscar um heroi especifico por ID\n");
+            printf("4. Voltar ao menu de gestao\n");
+        } else if (IdiomaActual == 3) {
+            printf("          DIE OAKHAVEN-CHRONIKEN - LOG\n");
+            printf("===================================================\n");
+            printf("1. Schnelle Heldenliste\n");
+            printf("2. ALLE illustrierten Karten anzeigen (ASCII)\n");
+            printf("3. Spezifischen Helden nach ID suchen\n");
+            printf("4. Zuruck zum Verwaltungsmenu\n");
+        } else {
+            printf("          THE OAKHAVEN CHRONICLES - LOG\n");
+            printf("===================================================\n");
+            printf("1. Quick heroes roster\n");
+            printf("2. Render ALL illustrated cards (ASCII)\n");
+            printf("3. Search a specific hero by ID\n");
+            printf("4. Return to log menu\n");
+        }
+        printf("%s", textos[IdiomaActual][5]);
+        scanf("%d", &opcSub);
+        printf("\n");
+
+        switch(opcSub) {
+            case 1:
+                printf("\n%-8s | %-25s | %-30s\n", "ID", (IdiomaActual == 0 || IdiomaActual == 2) ? "Nombre" : "Name", (IdiomaActual == 0 || IdiomaActual == 2) ? "Casa" : "Faction");
+                printf("------------------------------------------------------------------\n");
+                for(int i = 0; i < 12; i++) {
+                    char* nombre = (IdiomaActual == 0) ? catalogo[i].nombre_es : catalogo[i].nombre_en;
+                    printf("%-8s | %-25s | %-30s\n", catalogo[i].id, nombre, obtener_nombre_casa(catalogo[i].casa));
+                }
+                break;
+            case 2:
+                for(int i = 0; i < 12; i++) {
+                    mostrar_carta_ascii(catalogo[i]);
+                }
+                break;
+            case 3: {
+                char id_buscar[10];
+                int enc = 0;
+                printf((IdiomaActual == 0 || IdiomaActual == 2) ? "Ingrese ID (Ej: IMP-01): " : "Enter ID (e.g., IMP-01): ");
+                scanf("%s", id_buscar);
+                printf("\n");
+                for(int i = 0; i < 12; i++) {
+                    if(strcmp(catalogo[i].id, id_buscar) == 0) {
+                        mostrar_carta_ascii(catalogo[i]);
+                        enc = 1;
+                        break;
+                    }
+                }
+                if(!enc) {
+                    printf((IdiomaActual == 0 || IdiomaActual == 2) ? "No se encontro el ID.\n" : "ID not found.\n");
+                }
+                break;
+            }
+        }
+    } while (opcSub != 4);
+}
+
 void ProcesarTexto(char *cadena) {
-    // 1. Convertir todo a minúsculas
     for(int i = 0; cadena[i]; i++) {
         cadena[i] = tolower(cadena[i]);
     }
-
-    // 2. Lista de palabras prohibidas (puedes añadir más)
     const char *prohibidas[] = {"malo", "tonto", "badword", "stupid"};
     int numProhibidas = 4;
     int detectado = 0;
@@ -76,180 +338,10 @@ void ProcesarTexto(char *cadena) {
         char *pos = strstr(cadena, prohibidas[i]);
         while(pos != NULL) {
             detectado = 1;
-            // Censurar con #
-            for(int j = 0; j < strlen(prohibidas[i]); j++) {
+            for(size_t j = 0; j < strlen(prohibidas[i]); j++) {
                 pos[j] = '#';
             }
             pos = strstr(pos + 1, prohibidas[i]);
         }
     }
-
-    if(detectado) {
-        printf("\n!!! ADVERTENCIA: %s !!!\n", textos[IdiomaActual][15]);
-    }
-}
-
-void LimpiarPantalla() {
-    system("cls || clear");
-}
-
-void Pausa() {
-    printf("\nPress Enter...");
-    while (getchar() != '\n');
-    getchar();
-}
-
-void MostrarDatos(Partida p) {
-    printf("\n---------------------------\n");
-    printf(" Player: %s\n", p.nombre);
-    printf(" Score:  %d\n", p.puntos);
-    printf(" Level:  %d\n", p.nivel);
-    printf(" Diff:   %s\n", nivelesDificultad[IdiomaActual][p.dificultad]);
-    printf("---------------------------\n");
-}
-
-void GuardarEnSlot(Partida p, int slot) {
-    Partida todos[MAX_SLOTS] = {0}; 
-    FILE *archivo = fopen("save.dat", "rb");
-    if (archivo != NULL) {
-        fread(todos, sizeof(Partida), MAX_SLOTS, archivo);
-        fclose(archivo);
-    }
-    todos[slot] = p;
-    archivo = fopen("save.dat", "wb");
-    if (archivo != NULL) {
-        fwrite(todos, sizeof(Partida), MAX_SLOTS, archivo);
-        fclose(archivo);
-        printf("\n>>> %s (Slot %d) <<<\n", textos[IdiomaActual][8], slot + 1);
-    }
-}
-
-int CargarDeSlot(Partida *p, int slot) {
-    Partida todos[MAX_SLOTS];
-    FILE *archivo = fopen("save.dat", "rb");
-    if (archivo == NULL) return 0; 
-    fread(todos, sizeof(Partida), MAX_SLOTS, archivo);
-    fclose(archivo);
-    if (strlen(todos[slot].nombre) == 0) return 0;
-    *p = todos[slot];
-    return 1;
-}
-
-void MenuConfiguracion() {
-    int subOpcion;
-    do {
-        LimpiarPantalla();
-        printf("=== %s ===\n", textos[IdiomaActual][3]);
-        printf("1. %s (%s)\n", textos[IdiomaActual][12], IdiomaActual == 0 ? "Español" : "English");
-        printf("2. %s (%s)\n", textos[IdiomaActual][11], nivelesDificultad[IdiomaActual][DificultadActual]);
-        printf("3. %s\n", textos[IdiomaActual][13]);
-        printf("==================\n%s", textos[IdiomaActual][5]);
-        
-        scanf("%d", &subOpcion);
-        
-        switch(subOpcion) {
-            case 1:
-                printf("\n0. Español | 1. English: ");
-                scanf("%d", &IdiomaActual);
-                if(IdiomaActual < 0 || IdiomaActual > 1) IdiomaActual = 0;
-                printf("%s\n", textos[IdiomaActual][6]);
-                Pausa();
-                break;
-            case 2:
-                printf("\n0. %s | 1. %s | 2. %s: ", nivelesDificultad[IdiomaActual][0], nivelesDificultad[IdiomaActual][1], nivelesDificultad[IdiomaActual][2]);
-                scanf("%d", &DificultadActual);
-                if(DificultadActual < 0 || DificultadActual > 2) DificultadActual = 1;
-                printf("%s\n", textos[IdiomaActual][14]);
-                Pausa();
-                break;
-        }
-    } while (subOpcion != 3);
-}
-
-void MostrarMenuPrincipal() {
-    printf("=====================================\n");
-    printf(" --- The Title Is Still Working --- \n");
-    printf("=====================================\n");
-    for(int i = 0; i < 5; i++) {
-        printf("%d. %s\n", i + 1, textos[IdiomaActual][i]);
-    }
-    printf("=====================================\n");
-    printf("%s", textos[IdiomaActual][5]);
-}
-
-int main() {
-    int opcion, slot, subOpcion;
-    Partida partidaActual = {"sin nombre", 0, 0, 1};
-
-    do {
-        LimpiarPantalla();
-        MostrarMenuPrincipal();
-        
-        if (scanf("%d", &opcion) != 1) {
-            printf("\nError\n");
-            while (getchar() != '\n'); 
-            continue;
-        }
-
-        LimpiarPantalla();
-
-        switch (opcion) {
-            case 1:
-                printf("%s", textos[IdiomaActual][9]);
-                scanf("%d", &slot);
-                if(slot < 1 || slot > MAX_SLOTS) break;
-
-                printf("%s", textos[IdiomaActual][10]);
-                scanf("%d", &subOpcion);
-
-                if(subOpcion == 2) {
-                    char *nombres[] = {"alaric", "elara"};
-                    srand(time(NULL));
-                    strcpy(partidaActual.nombre, nombres[rand() % 2]);
-                    partidaActual.puntos = rand() % 100;
-                } else {
-                    printf("%s: ", textos[IdiomaActual][7]);
-                    scanf("%s", partidaActual.nombre);
-                    // LLAMADA A LA FUNCIÓN DE PROCESAMIENTO
-                    ProcesarTexto(partidaActual.nombre);
-                    partidaActual.puntos = 0;
-                }
-                partidaActual.nivel = 1;
-                partidaActual.dificultad = DificultadActual; 
-                
-                MostrarDatos(partidaActual); 
-                GuardarEnSlot(partidaActual, slot - 1);
-                Pausa();
-                break;
-
-            case 2: 
-                printf("%s", textos[IdiomaActual][9]);
-                scanf("%d", &slot);
-                if (CargarDeSlot(&partidaActual, slot - 1)) {
-                    printf("\n%s...\n", textos[IdiomaActual][1]);
-                    DificultadActual = partidaActual.dificultad; 
-                    MostrarDatos(partidaActual); 
-                } else {
-                    printf("\n[ Slot vacio / Empty slot ]\n");
-                }
-                Pausa();
-                break;
-
-            case 3:
-                printf("--- %s ---\n", textos[IdiomaActual][2]);
-                MostrarDatos(partidaActual);
-                Pausa();
-                break;
-
-            case 4: 
-                MenuConfiguracion();
-                break;
-
-            case 5:
-                printf("¡Gracias por jugar!\n");
-                break;
-        }
-    } while (opcion != 5);
-
-    return 0;
-}
+    if(d
