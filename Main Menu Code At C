@@ -41,28 +41,76 @@ typedef struct {
 // --- MATRICES DE TEXTO LOCALIZADAS (4 Idiomas) ---
 const char *textos[4][16] = {
     { // 0. ESPAÑOL
-        "Nueva Partida", "Cargar Partida", "Estadisticas", "Configuracion", "Salir",
-        "Seleccione una Opcion: ", "Idioma cambiado", "Ingrese su nombre", "Partida Guardada",
-        "Seleccione Slot (1-3): ", "", "Dificultad", "Idioma",
-        "Volver", "Dificultad cambiada", "No se acepta este tipo de vocabulario" 
+        "Nueva Partida", 
+        "Cargar Partida", 
+        "Estadisticas", 
+        "Configuracion", 
+        "Salir",
+        "Seleccione una Opcion: ", 
+        "Idioma cambiado", 
+        "Ingrese su nombre", 
+        "Partida Guardada",
+        "Seleccione Slot (1-3): ", 
+        "", 
+        "Dificultad", 
+        "Idioma",
+        "Volver", 
+        "Dificultad cambiada", 
+        "No se acepta este tipo de vocabulario" 
     },
     { // 1. ENGLISH
-        "New Game", "Load Game", "Statistics", "Configuration", "Exit",
-        "Select an Option: ", "Language changed", "Enter your name", "Game Saved",
-        "Select Slot (1-3): ", "", "Difficulty", "Language",
-        "Back", "Difficulty changed", "This type of vocabulary is not accepted" 
+        "New Game", 
+        "Load Game", 
+        "Statistics", 
+        "Configuration", 
+        "Exit",
+        "Select an Option: ", 
+        "Language changed", 
+        "Enter your name", 
+        "Game Saved",
+        "Select Slot (1-3): ", 
+        "", 
+        "Difficulty", 
+        "Language",
+        "Back", 
+        "Difficulty changed", 
+        "This type of vocabulary is not accepted" 
     },
     { // 2. PORTUGUÊS
-        "Novo Jogo", "Carregar Jogo", "Estatisticas", "Configuracao", "Sair",
-        "Selecione uma Opcao: ", "Idioma alterado", "Digite seu nome", "Jogo Salvo",
-        "Selecione o Slot (1-3): ", "", "Dificuldade", "Idioma",
-        "Voltar", "Dificuldade alterada", "Este tipo de vocabulario nao e aceito"
+        "Novo Jogo", 
+        "Carregar Jogo", 
+        "Estatisticas", 
+        "Configuracao", 
+        "Sair",
+        "Selecione uma Opcao: ", 
+        "Idioma alterado", 
+        "Digite seu nome", 
+        "Jogo Salvo",
+        "Selecione o Slot (1-3): ", 
+        "", 
+        "Dificuldade", 
+        "Idioma",
+        "Voltar", 
+        "Dificuldade alterada", 
+        "Este tipo de vocabulario nao e aceito"
     },
     { // 3. DEUTSCH
-        "Neues Spiel", "Spiel Laden", "Statistiken", "Konfiguration", "Beenden",
-        "Wahlen Sie eine Option: ", "Sprache geandert", "Geben Sie Ihren Namen ein", "Spiel Gespeichert",
-        "Slot Auswahlen (1-3): ", "", "Schwierigkeit", "Sprache",
-        "Zuruck", "Schwierigkeit geandert", "Diese Art von Vokabular wird nicht akzeptiert"
+        "Neues Spiel", 
+        "Spiel Laden", 
+        "Statistiken", 
+        "Konfiguration", 
+        "Beenden",
+        "Wahlen Sie eine Option: ", 
+        "Sprache geandert", 
+        "Geben Sie Ihren Namen ein", 
+        "Spiel Gespeichert",
+        "Slot Auswahlen (1-3): ", 
+        "", 
+        "Schwierigkeit", 
+        "Sprache",
+        "Zuruck", 
+        "Schwierigkeit geandert", 
+        "Diese Art von Vokabular wird nicht akzeptiert"
     }
 };
 
@@ -344,4 +392,175 @@ void ProcesarTexto(char *cadena) {
             pos = strstr(pos + 1, prohibidas[i]);
         }
     }
-    if(d
+    if(detectado) {
+        printf("\n!!! ADVERTENCIA: %s !!!\n", textos[IdiomaActual][15]);
+    }
+}
+
+void LimpiarPantalla() {
+    system("cls || clear");
+}
+
+void Pausa() {
+    printf("\nPress Enter...");
+    while (getchar() != '\n');
+    getchar();
+}
+
+void MostrarDatos(Partida p) {
+    printf("\n---------------------------\n");
+    printf(" Player: %s\n", p.nombre);
+    printf(" Score:  %d\n", p.puntos);
+    printf(" Level:  %d\n", p.nivel);
+    printf(" Diff:   %s\n", nivelesDificultad[IdiomaActual][p.dificultad]);
+    printf("---------------------------\n");
+}
+
+void GuardarEnSlot(Partida p, int slot) {
+    Partida todos[MAX_SLOTS] = {0}; 
+    FILE *archivo = fopen("save.dat", "rb");
+    if (archivo != NULL) {
+        fread(todos, sizeof(Partida), MAX_SLOTS, archivo);
+        fclose(archivo);
+    }
+    todos[slot] = p;
+    archivo = fopen("save.dat", "wb");
+    if (archivo != NULL) {
+        fwrite(todos, sizeof(Partida), MAX_SLOTS, archivo);
+        fclose(archivo);
+        printf("\n>>> %s (Slot %d) <<<\n", textos[IdiomaActual][8], slot + 1);
+    }
+}
+
+int CargarDeSlot(Partida *p, int slot) {
+    Partida todos[MAX_SLOTS];
+    FILE *archivo = fopen("save.dat", "rb");
+    if (archivo == NULL) return 0; 
+    fread(todos, sizeof(Partida), MAX_SLOTS, archivo);
+    fclose(archivo);
+    if (strlen(todos[slot].nombre) == 0) return 0;
+    *p = todos[slot];
+    return 1;
+}
+
+void MenuConfiguracion() {
+    int subOpcion;
+    do {
+        LimpiarPantalla();
+        printf("=== %s ===\n", textos[IdiomaActual][3]);
+        printf("1. %s (%s)\n", textos[IdiomaActual][12], nombresIdiomas[IdiomaActual]);
+        printf("2. %s (%s)\n", textos[IdiomaActual][11], nivelesDificultad[IdiomaActual][DificultadActual]);
+        printf("3. %s\n", textos[IdiomaActual][13]);
+        printf("==================\n%s", textos[IdiomaActual][5]);
+
+        scanf("%d", &subOpcion);
+
+        switch(subOpcion) {
+            case 1:
+                printf("\n");
+                for(int i = 0; i < 4; i++) {
+                    printf("%d. %s\n", i, nombresIdiomas[i]);
+                }
+                printf("%s", textos[IdiomaActual][5]);
+                scanf("%d", &IdiomaActual);
+                
+                if(IdiomaActual < 0 || IdiomaActual > 3) IdiomaActual = 0;
+                printf("%s\n", textos[IdiomaActual][6]);
+                Pausa();
+                break;
+            case 2:
+                printf("\n0. %s | 1. %s | 2. %s: ", nivelesDificultad[IdiomaActual][0], nivelesDificultad[IdiomaActual][1], nivelesDificultad[IdiomaActual][2]);
+                scanf("%d", &DificultadActual);
+                if(DificultadActual < 0 || DificultadActual > 2) DificultadActual = 1;
+                printf("%s\n", textos[IdiomaActual][14]);
+                Pausa();
+                break;
+        }
+    } while (subOpcion != 3);
+}
+
+void MostrarMenuPrincipal() {
+    printf("=====================================\n");
+    printf("    THE CHRONICLES OF OAKHAVEN       \n");
+    printf("=====================================\n");
+    for(int i = 0; i < 5; i++) {
+        printf("%d. %s\n", i + 1, textos[IdiomaActual][i]);
+    }
+    printf("=====================================\n");
+    printf("%s", textos[IdiomaActual][5]);
+}
+
+int main() {
+    int opcion, slot;
+    Partida partidaActual = {"sin nombre", 0, 0, 1};
+
+    do {
+        LimpiarPantalla();
+        MostrarMenuPrincipal();
+
+        if (scanf("%d", &opcion) != 1) {
+            printf("\nError\n");
+            while (getchar() != '\n'); 
+            continue;
+        }
+
+        LimpiarPantalla();
+
+        switch (opcion) {
+            case 1: // Nueva Partida (100% Manual y enfocado en Oakhaven)
+                printf("%s", textos[IdiomaActual][9]);
+                scanf("%d", &slot);
+                if(slot < 1 || slot > MAX_SLOTS) break;
+
+                // Removida por completo la opción de nombres aleatorios
+                printf("%s: ", textos[IdiomaActual][7]);
+                scanf("%s", partidaActual.nombre);
+                
+                ProcesarTexto(partidaActual.nombre);
+                partidaActual.puntos = 0;
+                partidaActual.nivel = 1;
+                partidaActual.dificultad = DificultadActual; 
+
+                MostrarDatos(partidaActual); 
+                GuardarEnSlot(partidaActual, slot - 1);
+                Pausa();
+                
+                SubmenuGestaOakhaven();
+                break;
+
+            case 2: // Cargar Partida
+                printf("%s", textos[IdiomaActual][9]);
+                scanf("%d", &slot);
+                if (CargarDeSlot(&partidaActual, slot - 1)) {
+                    printf("\n%s...\n", textos[IdiomaActual][1]);
+                    DificultadActual = partidaActual.dificultad; 
+                    MostrarDatos(partidaActual); 
+                    Pausa();
+                    SubmenuGestaOakhaven();
+                } else {
+                    printf("\n[ Slot vacio / Empty slot ]\n");
+                    Pausa();
+                }
+                break;
+
+            case 3: // Estadísticas
+                printf("--- %s ---\n", textos[IdiomaActual][2]);
+                MostrarDatos(partidaActual);
+                Pausa();
+                break;
+
+            case 4: // Configuración
+                MenuConfiguracion();
+                break;
+
+            case 5: // Salida del Software
+                if (IdiomaActual == 0)      printf("¡Gracias por jugar Oakhaven!\n");
+                else if (IdiomaActual == 2) printf("Obrigado por jogar Oakhaven!\n");
+                else if (IdiomaActual == 3) printf("Danke fürs Spielen von Oakhaven!\n");
+                else                        printf("Thanks for playing Oakhaven!\n");
+                break;
+        }
+    } while (opcion != 5);
+
+    return 0;
+}
